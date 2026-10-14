@@ -109,7 +109,36 @@
     box-shadow: 0 4px 16px rgba(0,0,0,.12);
   }
   #cmp-result.muted { background: var(--card); }
-  .price-row { display: grid; grid-template-columns: 1fr 104px; gap: 10px; }
+  /* 価格・容量・単位を1行に並べる */
+  .qty-row { display: grid; grid-template-columns: 1fr 1fr 96px; gap: 8px; }
+
+  /* ===== アプリ内の電卓キー ===== */
+  .keypad {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+    background: var(--card); border-top: 1px solid var(--line);
+    box-shadow: 0 -6px 20px rgba(0,0,0,.12);
+    padding: 6px 8px calc(env(safe-area-inset-bottom) + 8px);
+  }
+  .kp-inner { max-width: 520px; margin: 0 auto; }
+  .kp-bar { display: flex; justify-content: space-between; gap: 8px; padding: 2px 4px 6px; font-size: 15px; color: var(--sub); min-height: 28px; }
+  .kp-bar b { color: var(--text); }
+  .kp-grid { display: grid; grid-template-columns: repeat(5, 1fr); grid-auto-rows: 50px; gap: 6px; }
+  .kp-grid button {
+    font-size: 22px; font-weight: 600; border: 0; border-radius: 10px; cursor: pointer;
+    background: var(--bg); color: var(--text); -webkit-user-select: none; user-select: none;
+  }
+  .kp-grid button:active { opacity: .6; }
+  .kp-grid .op { color: var(--accent); }
+  .kp-grid .fn { font-size: 17px; color: var(--sub); }
+  .kp-grid .done { grid-row: span 2; background: var(--accent); color: var(--accent-text); font-size: 18px; }
+  .kp-grid .zero { grid-column: span 2; }
+  input.calc { caret-color: var(--accent); }
+  input.kp-active { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(22,163,74,.25); }
+  /* 電卓キーが出ている間は、その分だけ下に余白をとる */
+  body.kp-open main { padding-bottom: calc(var(--kp-h, 300px) + 90px); }
+  body.kp-open #cmp-result { bottom: calc(var(--kp-h, 300px) + 8px); }
+  body.kp-open .sheet { padding-bottom: calc(var(--kp-h, 300px) + 20px); }
+  body.kp-open .toast { bottom: calc(var(--kp-h, 300px) + 12px); }
 
   /* ===== 記録タブ ===== */
   .list { display: grid; gap: 10px; margin-top: 12px; }
@@ -257,14 +286,11 @@
       <input type="text" id="edit-item" list="dl-items" autocomplete="off"></div>
     <div class="field"><label for="edit-product">商品名</label>
       <input type="text" id="edit-product" autocomplete="off"></div>
-    <div class="field"><label for="edit-price">価格（円）</label>
-      <input type="text" id="edit-price" inputmode="decimal" autocomplete="off"></div>
-    <div class="field size-row">
-      <div><label for="edit-size">容量</label><input type="text" id="edit-size" inputmode="decimal" autocomplete="off"></div>
+    <div class="field qty-row">
+      <div><label for="edit-price">価格（円）</label><input type="text" id="edit-price" class="calc" inputmode="none" autocomplete="off"></div>
+      <div><label for="edit-size">容量</label><input type="text" id="edit-size" class="calc" inputmode="none" autocomplete="off"></div>
       <div><label for="edit-unit">単位</label><select id="edit-unit"></select></div>
     </div>
-    <div class="field"><label for="edit-count">入数</label>
-      <input type="text" id="edit-count" inputmode="decimal" autocomplete="off"></div>
     <div class="field"><label for="edit-shop">お店</label>
       <input type="text" id="edit-shop" list="dl-shops" autocomplete="off"></div>
     <label class="switch"><input type="checkbox" id="edit-sale">セール品</label>
@@ -284,14 +310,12 @@
       <button type="button" class="btn close" data-close>閉じる</button>
     </div>
     <div id="rc-summary" class="summary"></div>
-    <div class="field"><label for="rc-price">目の前の商品の価格（円）</label>
-      <input type="text" id="rc-price" inputmode="decimal" autocomplete="off"></div>
-    <div class="field size-row">
-      <div><label for="rc-size">容量</label><input type="text" id="rc-size" inputmode="decimal" autocomplete="off"></div>
+    <p class="rec-sub">目の前の商品</p>
+    <div class="field qty-row">
+      <div><label for="rc-price">価格（円）</label><input type="text" id="rc-price" class="calc" inputmode="none" autocomplete="off"></div>
+      <div><label for="rc-size">容量</label><input type="text" id="rc-size" class="calc" inputmode="none" autocomplete="off"></div>
       <div><label for="rc-unit">単位</label><select id="rc-unit"></select></div>
     </div>
-    <div class="field"><label for="rc-count">入数</label>
-      <input type="text" id="rc-count" inputmode="decimal" value="1" autocomplete="off"></div>
     <div id="rc-unitprice" class="unit-price"></div>
     <div id="rc-result" class="result muted">価格と容量を入れると記録と比べます</div>
     <button type="button" id="btn-rc-update" class="btn primary block hidden">この商品で記録を更新</button>
@@ -300,60 +324,98 @@
 
 <div id="toast" class="toast hidden" role="status"></div>
 
+<!-- ========== アプリ内の電卓キー（価格・容量の入力用） ========== -->
+<div id="keypad" class="keypad hidden">
+  <div class="kp-inner">
+    <div class="kp-bar"><span id="kp-label"></span><b id="kp-value"></b></div>
+    <div class="kp-grid">
+      <button type="button" data-k="7">7</button>
+      <button type="button" data-k="8">8</button>
+      <button type="button" data-k="9">9</button>
+      <button type="button" data-k="÷" class="op">÷</button>
+      <button type="button" data-k="back" class="fn" aria-label="1文字消す">⌫</button>
+      <button type="button" data-k="4">4</button>
+      <button type="button" data-k="5">5</button>
+      <button type="button" data-k="6">6</button>
+      <button type="button" data-k="×" class="op">×</button>
+      <button type="button" data-k="clear" class="fn">C</button>
+      <button type="button" data-k="1">1</button>
+      <button type="button" data-k="2">2</button>
+      <button type="button" data-k="3">3</button>
+      <button type="button" data-k="−" class="op">−</button>
+      <button type="button" data-k="done" class="done">完了</button>
+      <button type="button" data-k="0" class="zero">0</button>
+      <button type="button" data-k=".">.</button>
+      <button type="button" data-k="+" class="op">+</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===================== 計算ロジック（画面に依存しない純粋な関数） ===================== -->
 <script id="calc-logic">
 // 浮動小数の誤差を避けるため、数値はすべて「分子n / 分母d」の分数（BigInt）で扱う
 
-// 単位の定義：kind=種類、base=表示の基準単位、n/d=基準単位への倍率（分数）
+// 単位の定義：kind=種類、base=単価の表示単位、per=差額の表示（「1gあたり」など）、n/d=基準単位への倍率（分数）
 const UNITS = {
-  'g':    { kind: 'weight', base: 'g',    n: 1n,    d: 1n },
-  'kg':   { kind: 'weight', base: 'g',    n: 1000n, d: 1n },   // kg→g
-  'ml':   { kind: 'volume', base: 'ml',   n: 1n,    d: 1n },
-  'L':    { kind: 'volume', base: 'ml',   n: 1000n, d: 1n },   // L→ml
-  'm':    { kind: 'length', base: 'm',    n: 1n,    d: 1n },
-  'cm':   { kind: 'length', base: 'm',    n: 1n,    d: 100n }, // cm→m
-  '個':   { kind: 'piece',  base: '個',   n: 1n,    d: 1n },
-  '枚':   { kind: 'sheet',  base: '枚',   n: 1n,    d: 1n },
-  'ロール': { kind: 'roll', base: 'ロール', n: 1n,    d: 1n }
+  'g':    { kind: 'weight', base: 'g',    per: '1gあたり',    n: 1n,    d: 1n },
+  'kg':   { kind: 'weight', base: 'g',    per: '1gあたり',    n: 1000n, d: 1n },   // kg→g
+  'ml':   { kind: 'volume', base: 'ml',   per: '1mlあたり',   n: 1n,    d: 1n },
+  'L':    { kind: 'volume', base: 'ml',   per: '1mlあたり',   n: 1000n, d: 1n },   // L→ml
+  'm':    { kind: 'length', base: 'm',    per: '1mあたり',    n: 1n,    d: 1n },
+  'cm':   { kind: 'length', base: 'm',    per: '1mあたり',    n: 1n,    d: 100n }, // cm→m
+  '個':   { kind: 'piece',  base: '個',   per: '1個あたり',   n: 1n,    d: 1n },
+  '枚':   { kind: 'sheet',  base: '枚',   per: '1枚あたり',   n: 1n,    d: 1n },
+  'ロール': { kind: 'roll', base: 'ロール', per: '1ロールあたり', n: 1n, d: 1n },
+  'その他': { kind: 'other', base: 'その他', per: '1単位あたり', n: 1n,  d: 1n }
 };
 const UNIT_LIST = Object.keys(UNITS);
 const KIND_NAMES = {
   weight: '重さ（g・kg）', volume: '容量（ml・L）', length: '長さ（m・cm）',
-  piece: '個数（個）', sheet: '枚数（枚）', roll: 'ロール数（ロール）'
+  piece: '個数（個）', sheet: '枚数（枚）', roll: 'ロール数（ロール）', other: '「その他」'
 };
 
-// 入力文字列 → 正の分数 {n, d}。全角数字・カンマ可。0以下や数字以外は null
-function parseDecimal(v) {
+// 数字1つ（"500"・"1.5"・入力途中の "5."）→ 分数 {n, d}。0 も可。数字以外は null
+function parseNumber(s) {
+  const m = /^(\d*)(?:\.(\d*))?$/.exec(s);
+  if (!m) return null;
+  const i = m[1], f = m[2] || '';
+  if (i.length + f.length === 0 || i.length > 9 || f.length > 6) return null;
+  return { n: BigInt((i || '0') + f), d: 10n ** BigInt(f.length) };
+}
+
+// 入力欄の文字（数字、または電卓の式「500×6」など）→ 正の分数 {n, d}。計算できない・0以下は null
+// × ÷ は + − より先に計算する。入力途中の末尾の記号は無視する
+function evalExpr(v) {
   if (v === null || v === undefined) return null;
-  let s = String(v).normalize('NFKC').replace(/[,\s]/g, '');
-  if (s.startsWith('.')) s = '0' + s;
-  if (!/^\d{1,9}(\.\d{1,6})?$/.test(s)) return null;
-  const [i, f = ''] = s.split('.');
-  const n = BigInt(i + f);
-  if (n === 0n) return null;
-  return { n, d: 10n ** BigInt(f.length) };
-}
-
-// 単価を計算：価格 ÷（容量 × 入数 × 単位の倍率）。入数が空なら1
-function calcUnitPrice(price, size, unit, count) {
-  const u = UNITS[unit];
-  if (!u) return null;
-  const p = parseDecimal(price);
-  const s = parseDecimal(size);
-  const c = (count === '' || count === null || count === undefined) ? { n: 1n, d: 1n } : parseDecimal(count);
-  if (!p || !s || !c) return null;
-  return {
-    n: p.n * s.d * c.d * u.d,
-    d: p.d * s.n * c.n * u.n,
-    kind: u.kind,
-    base: u.base
-  };
-}
-
-// 分数の大小比較（-1: a<b, 0: 同じ, 1: a>b）
-function cmpFrac(a, b) {
-  const l = a.n * b.d, r = b.n * a.d;
-  return l < r ? -1 : (l > r ? 1 : 0);
+  let s = String(v).normalize('NFKC').replace(/[,\s]/g, '')
+    .replace(/[×xX*]/g, '*').replace(/[÷/]/g, '/').replace(/[−ー‐-]/g, '-');
+  s = s.replace(/[+\-*/]+$/, '');
+  if (!s || s.length > 60) return null;
+  const parts = s.split(/([+\-*/])/);
+  const nums = [];
+  for (let k = 0; k < parts.length; k += 2) {
+    const x = parseNumber(parts[k]);
+    if (!x) return null;
+    nums.push(x);
+  }
+  let total = { n: 0n, d: 1n };
+  let term = nums[0];
+  let sign = 1n;
+  for (let k = 1; k < parts.length; k += 2) {
+    const op = parts[k], x = nums[(k + 1) / 2];
+    if (op === '*') term = { n: term.n * x.n, d: term.d * x.d };
+    else if (op === '/') {
+      if (x.n === 0n) return null;   // 0で割る
+      term = { n: term.n * x.d, d: term.d * x.n };
+    } else {
+      total = { n: total.n * term.d + sign * term.n * total.d, d: total.d * term.d };
+      sign = op === '+' ? 1n : -1n;
+      term = x;
+    }
+  }
+  total = { n: total.n * term.d + sign * term.n * total.d, d: total.d * term.d };
+  if (total.n <= 0n) return null;
+  return total;
 }
 
 // 正の分数を小数第digits位で四捨五入し、10^digits 倍した整数で返す
@@ -369,6 +431,38 @@ function formatScaled(v, digits) {
   return (v / m).toString() + '.' + (v % m).toString().padStart(digits, '0');
 }
 
+// 入力欄の文字 → 保存用の数字文字列（小数第6位まで、余分な0は消す）。"500×6" → "3000"。不正なら null
+function toAmountString(v) {
+  const f = evalExpr(v);
+  if (!f) return null;
+  const r = roundFrac(f, 6);
+  if (r === 0n) return null;
+  const s = formatScaled(r, 6).replace(/\.?0+$/, '');
+  return s.split('.')[0].length > 9 ? null : s;
+}
+
+// 単価を計算：価格 ÷（容量 × 単位の倍率）
+function calcUnitPrice(price, size, unit) {
+  const u = UNITS[unit];
+  if (!u) return null;
+  const p = evalExpr(price);
+  const s = evalExpr(size);
+  if (!p || !s) return null;
+  return {
+    n: p.n * s.d * u.d,
+    d: p.d * s.n * u.n,
+    kind: u.kind,
+    base: u.base,
+    per: u.per
+  };
+}
+
+// 分数の大小比較（-1: a<b, 0: 同じ, 1: a>b）
+function cmpFrac(a, b) {
+  const l = a.n * b.d, r = b.n * a.d;
+  return l < r ? -1 : (l > r ? 1 : 0);
+}
+
 // 単価の表示用文字列（小数第2位まで）："1.99"
 function formatYen(f) { return formatScaled(roundFrac(f, 2), 2); }
 
@@ -382,7 +476,7 @@ function compareUnitPrices(a, b) {
   if (!a || !b) return { status: 'invalid' };
   if (a.kind !== b.kind) return { status: 'kind' };
   const c = cmpFrac(a, b);
-  if (c === 0) return { status: 'same', base: a.base };
+  if (c === 0) return { status: 'same', per: a.per };
   const lo = c < 0 ? a : b;
   const hi = c < 0 ? b : a;
   // 差額 = 高い単価 − 安い単価
@@ -392,7 +486,7 @@ function compareUnitPrices(a, b) {
   // お得率 = 差額 ÷ 高い単価 × 100（整数に四捨五入）
   const pct = roundFrac({ n: diff.n * hi.d * 100n, d: diff.d * hi.n }, 0);
   const pctText = pct === 0n ? '1%未満' : '約' + pct.toString() + '%';
-  return { status: 'diff', cheaper: c < 0 ? 'a' : 'b', base: a.base, diffText, pctText };
+  return { status: 'diff', cheaper: c < 0 ? 'a' : 'b', per: a.per, diffText, pctText };
 }
 
 // 品目名の一致判定用（前後の空白・全角半角・大文字小文字の違いを無視）
@@ -406,17 +500,22 @@ function sanitizeRecord(r) {
   const str = (v) => (typeof v === 'string' ? v : '');
   const item = str(r.item).trim();
   if (!item || !UNITS[r.unit]) return null;
-  const count = (r.count === undefined || r.count === null || r.count === '') ? 1 : r.count;
-  const up = calcUnitPrice(String(r.price), String(r.size), r.unit, String(count));
-  if (!up) return null;
+  // 以前の版の「入数」つきの記録は、容量×入数 に直して単価を変えない
+  let sizeSrc = String(r.size);
+  if (r.count !== undefined && r.count !== null && r.count !== '' && String(r.count) !== '1') {
+    sizeSrc = sizeSrc + '*' + String(r.count);
+  }
+  const price = toAmountString(String(r.price));
+  const size = toAmountString(sizeSrc);
+  if (!price || !size) return null;
+  const up = calcUnitPrice(price, size, r.unit);
   return {
     id: (typeof r.id === 'string' && r.id) ? r.id : newId(),
     item,
     product: str(r.product),
-    price: Number(String(r.price).normalize('NFKC').replace(/,/g, '')),
-    size: Number(String(r.size).normalize('NFKC').replace(/,/g, '')),
+    price: Number(price),
+    size: Number(size),
     unit: r.unit,
-    count: Number(String(count).normalize('NFKC').replace(/,/g, '')),
     unitPrice: Number(formatYen(up)),   // 表示用の参考値（判定は毎回計算し直す）
     shop: str(r.shop),
     sale: r.sale === true,
@@ -445,7 +544,7 @@ function parseRecords(raw) {
 }
 
 // 記録の単価（分数）
-function recordUnitPrice(r) { return calcUnitPrice(String(r.price), String(r.size), r.unit, String(r.count)); }
+function recordUnitPrice(r) { return calcUnitPrice(String(r.price), String(r.size), r.unit); }
 
 // 保存時の更新ルール判定
 // 戻り値 action: 'new'（新規保存）/ 'kind'（種類違いで保存不可）/ 'cheaper'（安い→更新確認）/ 'notCheaper'（高い・同じ→上書き確認）
@@ -563,11 +662,134 @@ function todayStr() {
 
   // 数値の表示（入力された形をなるべくそのまま）
   const fmtNum = (n) => String(n);
-  // "398円 / 50m × 4"
-  function describeQty(price, size, unit, count) {
-    const c = String(count === '' || count == null ? '1' : count).normalize('NFKC');
-    return String(price).normalize('NFKC') + '円 / ' + String(size).normalize('NFKC') + unit + (c !== '1' ? ' × ' + c : '');
+  // 容量の表示："500ml"、単位がその他なら "5（その他）"
+  const fmtSize = (size, unit) => String(size) + (unit === 'その他' ? '（その他）' : unit);
+  // "398円 / 200m"
+  function describeQty(price, size, unit) {
+    return String(price) + '円 / ' + fmtSize(size, unit);
   }
+
+  // ---------- アプリ内の電卓キー ----------
+  // 価格・容量の欄（class="calc"）をタップすると、iPhoneのキーボードの代わりに電卓キーを出す
+  const keypad = $('keypad');
+  let kpTarget = null;
+
+  // 欄の式（"500×6" など）を計算結果（"3000"）に置き換える
+  function commitCalc(input) {
+    if (!input) return;
+    const v = toAmountString(input.value);
+    if (v !== null && v !== input.value) {
+      input.value = v;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  }
+
+  // 電卓キーの上に「どの欄か」と「計算結果」を表示
+  function updateKpBar() {
+    if (!kpTarget) return;
+    const label = document.querySelector('label[for="' + kpTarget.id + '"]');
+    const card = kpTarget.closest('.card');
+    $('kp-label').textContent = (card ? card.querySelector('h2').textContent + '　' : '') + (label ? label.textContent : '');
+    const hasOp = /[+\-−×÷*/]/.test(kpTarget.value.replace(/[+\-−×÷*/]+$/, ''));
+    const v = toAmountString(kpTarget.value);
+    $('kp-value').textContent = hasOp && v !== null ? '= ' + v : '';
+  }
+
+  function openKeypad(input) {
+    if (kpTarget && kpTarget !== input) {
+      kpTarget.classList.remove('kp-active');
+      commitCalc(kpTarget);
+    }
+    kpTarget = input;
+    input.classList.add('kp-active');
+    keypad.classList.remove('hidden');
+    document.body.classList.add('kp-open');
+    document.body.style.setProperty('--kp-h', keypad.offsetHeight + 'px');
+    updateKpBar();
+    // 入力中の欄が電卓キーに隠れないようにスクロール
+    setTimeout(() => {
+      if (input.closest('#sheet-rcompare')) { keepResultVisible(); return; }
+      const r = input.getBoundingClientRect();
+      if (r.bottom > window.innerHeight - keypad.offsetHeight - 70 || r.top < 60) {
+        input.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }, 30);
+  }
+
+  // 「記録と比べる」では、判定結果も電卓キーの上に見えるようにスクロール
+  function keepResultVisible() {
+    if (!kpTarget || !kpTarget.closest('#sheet-rcompare')) return;
+    const limit = window.innerHeight - keypad.offsetHeight - 8;
+    const over = $('rc-result').getBoundingClientRect().bottom - limit;
+    const room = kpTarget.getBoundingClientRect().top - 70;
+    const d = Math.min(over, room);
+    if (d > 0) kpTarget.closest('.sheet').scrollBy({ top: d, behavior: 'smooth' });
+  }
+
+  function closeKeypad() {
+    if (!kpTarget) return;
+    const t = kpTarget;
+    kpTarget = null;
+    t.classList.remove('kp-active');
+    commitCalc(t);
+    t.blur();
+    keypad.classList.add('hidden');
+    document.body.classList.remove('kp-open');
+  }
+
+  // キーを押したときの処理
+  function pressKey(k) {
+    const input = kpTarget;
+    if (!input) return;
+    if (k === 'done') { closeKeypad(); return; }
+    let v = input.value;
+    const OPS = '+−×÷';
+    const last = v.slice(-1);
+    if (k === 'back') v = v.slice(0, -1);
+    else if (k === 'clear') v = '';
+    else if (OPS.includes(k)) {
+      if (!v) return;                                     // 先頭に記号は置けない
+      v = (OPS.includes(last) ? v.slice(0, -1) : v) + k;   // 記号の連続は置き換え
+    } else if (k === '.') {
+      const seg = v.split(/[+−×÷]/).pop();
+      if (seg.includes('.')) return;                      // 1つの数字に小数点は1つだけ
+      v += seg === '' ? '0.' : '.';
+    } else {
+      v += k;
+    }
+    input.value = v;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    updateKpBar();
+    keepResultVisible();
+  }
+
+  // キーを押してもフォーカスが欄から外れないようにする
+  keypad.addEventListener('pointerdown', (e) => e.preventDefault());
+  keypad.addEventListener('mousedown', (e) => e.preventDefault());
+  keypad.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-k]');
+    if (b) pressKey(b.dataset.k);
+  });
+  document.addEventListener('focusin', (e) => {
+    if (e.target.classList && e.target.classList.contains('calc')) openKeypad(e.target);
+  });
+  // 電卓キーと計算欄以外をタップしたら電卓キーを閉じる
+  // （押した瞬間に閉じると画面がずれてボタンを押し損なうため、click の時点で閉じる）
+  // 電卓キーが出ると画面が少しずれるので、「指を置いた場所」で判定する
+  const isCalcArea = (el) => keypad.contains(el) || (el.classList && el.classList.contains('calc'));
+  let downInCalc = false;
+  document.addEventListener('pointerdown', (e) => { downInCalc = isCalcArea(e.target); }, true);
+  document.addEventListener('click', (e) => {
+    if (kpTarget && !downInCalc && !isCalcArea(e.target)) closeKeypad();
+    downInCalc = false;
+  }, true);
+  // 品目名などほかの入力欄や単位の選択に移ったときも閉じる
+  // （ボタンはここでは閉じない。閉じると画面がずれて押し損なうため、上の click で閉じる）
+  document.addEventListener('focusin', (e) => {
+    if (kpTarget && !isCalcArea(e.target) && /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) closeKeypad();
+  });
+  // パソコンのキーボードで直接入力したときも計算結果を表示
+  document.addEventListener('input', (e) => { if (e.target === kpTarget) updateKpBar(); });
 
   // ---------- シート（下から出る画面）の開け閉め ----------
   function openSheet(id) {
@@ -576,6 +798,7 @@ function todayStr() {
     $(id).querySelector('.sheet').scrollTop = 0;
   }
   function closeSheets() {
+    closeKeypad();
     document.querySelectorAll('.overlay').forEach((o) => o.classList.add('hidden'));
   }
   document.querySelectorAll('[data-close]').forEach((b) => b.addEventListener('click', closeSheets));
@@ -584,6 +807,7 @@ function todayStr() {
 
   // ---------- タブ切り替え ----------
   function switchTab(name) {
+    closeKeypad();
     document.querySelectorAll('nav.tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === name)));
     $('tab-compare').classList.toggle('hidden', name !== 'compare');
     $('tab-records').classList.toggle('hidden', name !== 'records');
@@ -605,12 +829,9 @@ function todayStr() {
     card.id = 'card-' + s;
     card.innerHTML =
       '<div class="card-head"><h2>商品' + L + '</h2><span class="badge hidden" id="badge-' + s + '">お得！</span></div>' +
-      '<div class="field price-row">' +
-        '<div><label for="' + s + '-price">価格（円）</label><input type="text" id="' + s + '-price" inputmode="decimal" autocomplete="off" placeholder="例：398"></div>' +
-        '<div><label for="' + s + '-count">入数</label><input type="text" id="' + s + '-count" inputmode="decimal" autocomplete="off" value="1"></div>' +
-      '</div>' +
-      '<div class="field size-row">' +
-        '<div><label for="' + s + '-size">容量（1個あたり）</label><input type="text" id="' + s + '-size" inputmode="decimal" autocomplete="off" placeholder="例：500"></div>' +
+      '<div class="field qty-row">' +
+        '<div><label for="' + s + '-price">価格（円）</label><input type="text" id="' + s + '-price" class="calc" inputmode="none" autocomplete="off" placeholder="398"></div>' +
+        '<div><label for="' + s + '-size">容量</label><input type="text" id="' + s + '-size" class="calc" inputmode="none" autocomplete="off" placeholder="500"></div>' +
         '<div><label for="' + s + '-unit">単位</label><select id="' + s + '-unit"></select></div>' +
       '</div>' +
       '<div class="unit-price" id="' + s + '-up">単価：—</div>' +
@@ -622,8 +843,7 @@ function todayStr() {
   const readSide = (s) => ({
     price: $(s + '-price').value,
     size: $(s + '-size').value,
-    unit: $(s + '-unit').value,
-    count: $(s + '-count').value
+    unit: $(s + '-unit').value
   });
   const isEmptySide = (s) => !$(s + '-price').value.trim() && !$(s + '-size').value.trim();
 
@@ -631,7 +851,7 @@ function todayStr() {
     const ups = {};
     SIDES.forEach((s) => {
       const v = readSide(s);
-      ups[s] = calcUnitPrice(v.price, v.size, v.unit, v.count);
+      ups[s] = calcUnitPrice(v.price, v.size, v.unit);
       $(s + '-up').innerHTML = ups[s]
         ? '単価：<strong>' + formatYen(ups[s]) + '</strong>円/' + esc(ups[s].base)
         : '単価：—';
@@ -659,12 +879,12 @@ function todayStr() {
       res.textContent = '単位の種類が違うため比較できません';
     } else if (r.status === 'same') {
       res.className = 'result';
-      res.textContent = '同じ（どちらも1' + r.base + 'あたり' + formatYen(ups.a) + '円）';
+      res.textContent = '同じ（どちらも' + r.per + formatYen(ups.a) + '円）';
       SIDES.forEach((s) => $(s + '-record').classList.remove('hidden'));
     } else {
       const w = r.cheaper;
       res.className = 'result good';
-      res.textContent = w.toUpperCase() + 'のほうが1' + r.base + 'あたり' + r.diffText + '安い（' + r.pctText + 'お得）';
+      res.textContent = w.toUpperCase() + 'のほうが' + r.per + r.diffText + '安い（' + r.pctText + 'お得）';
       $('card-' + w).classList.add('best');
       $('badge-' + w).classList.remove('hidden');
       $(w + '-record').classList.remove('hidden');
@@ -672,7 +892,7 @@ function todayStr() {
   }
 
   SIDES.forEach((s) => {
-    ['price', 'size', 'count'].forEach((f) => $(s + '-' + f).addEventListener('input', updateCompare));
+    ['price', 'size'].forEach((f) => $(s + '-' + f).addEventListener('input', updateCompare));
     $(s + '-unit').addEventListener('change', () => {
       // もう片方が未入力なら、単位を合わせておく（入力の手間を減らす）
       const other = s === 'a' ? 'b' : 'a';
@@ -686,10 +906,10 @@ function todayStr() {
   });
 
   $('btn-clear').addEventListener('click', () => {
+    closeKeypad();
     SIDES.forEach((s) => {
       $(s + '-price').value = '';
       $(s + '-size').value = '';
-      $(s + '-count').value = '1';
       $(s + '-unit').value = 'g';
     });
     updateCompare();
@@ -701,16 +921,13 @@ function todayStr() {
   let saveDraft = null;   // 保存しようとしている商品の価格・容量など
 
   function openSave(v, itemName) {
-    const up = calcUnitPrice(v.price, v.size, v.unit, v.count);
-    if (!up) return;
-    saveDraft = {
-      price: String(v.price).normalize('NFKC').replace(/,/g, ''),
-      size: String(v.size).normalize('NFKC').replace(/,/g, ''),
-      unit: v.unit,
-      count: (String(v.count).normalize('NFKC').replace(/,/g, '').trim()) || '1'
-    };
+    // 電卓の式は計算結果の数字にしてから保存する
+    const price = toAmountString(v.price), size = toAmountString(v.size);
+    const up = calcUnitPrice(price, size, v.unit);
+    if (!up) { showToast('価格・容量を確認してください'); return; }
+    saveDraft = { price, size, unit: v.unit };
     $('save-summary').innerHTML =
-      '<div>' + esc(describeQty(saveDraft.price, saveDraft.size, saveDraft.unit, saveDraft.count)) + '</div>' +
+      '<div>' + esc(describeQty(saveDraft.price, saveDraft.size, saveDraft.unit)) + '</div>' +
       '<div class="big">' + esc(formatUnitPrice(up)) + '</div>';
     $('save-item').value = itemName || '';
     $('save-product').value = '';
@@ -732,7 +949,7 @@ function todayStr() {
     const item = $('save-item').value.trim();
     if (!item) { showError('save-error', '品目名を入力してください'); return; }
     const d = saveDraft;
-    const up = calcUnitPrice(d.price, d.size, d.unit, d.count);
+    const up = calcUnitPrice(d.price, d.size, d.unit);
     if (!up) return;
 
     // 更新ルールの判定
@@ -750,7 +967,7 @@ function todayStr() {
       id: j.existing ? j.existing.id : newId(),
       item,
       product: $('save-product').value.trim(),
-      price: d.price, size: d.size, unit: d.unit, count: d.count,
+      price: d.price, size: d.size, unit: d.unit,
       shop: $('save-shop').value.trim(),
       sale: $('save-sale').checked,
       memo: $('save-memo').value,
@@ -813,8 +1030,7 @@ function todayStr() {
       ['商品名', r.product || '—'],
       ['単価', formatUnitPrice(up)],
       ['価格', fmtNum(r.price) + '円'],
-      ['容量', fmtNum(r.size) + r.unit],
-      ['入数', fmtNum(r.count)],
+      ['容量', fmtSize(r.size, r.unit)],
       ['お店', r.shop || '—'],
       ['セール品', r.sale ? 'はい' : 'いいえ'],
       ['メモ', r.memo || '—'],
@@ -845,7 +1061,6 @@ function todayStr() {
     $('edit-price').value = fmtNum(r.price);
     $('edit-size').value = fmtNum(r.size);
     fillUnitSelect($('edit-unit'), unitsOfKind(UNITS[r.unit].kind), r.unit);   // 同じ種類の単位だけ選べる
-    $('edit-count').value = fmtNum(r.count);
     $('edit-shop').value = r.shop;
     $('edit-sale').checked = r.sale;
     $('edit-memo').value = r.memo;
@@ -856,12 +1071,12 @@ function todayStr() {
   });
 
   function updateEditPreview() {
-    const up = calcUnitPrice($('edit-price').value, $('edit-size').value, $('edit-unit').value, $('edit-count').value);
+    const up = calcUnitPrice($('edit-price').value, $('edit-size').value, $('edit-unit').value);
     $('edit-preview').innerHTML = up
       ? '単価：<span class="big">' + esc(formatUnitPrice(up)) + '</span>'
-      : '単価：— （価格・容量・入数を正しく入力してください）';
+      : '単価：— （価格・容量を正しく入力してください）';
   }
-  ['edit-price', 'edit-size', 'edit-count'].forEach((id) => $(id).addEventListener('input', updateEditPreview));
+  ['edit-price', 'edit-size'].forEach((id) => $(id).addEventListener('input', updateEditPreview));
   $('edit-unit').addEventListener('change', updateEditPreview);
 
   $('btn-edit-save').addEventListener('click', () => {
@@ -876,13 +1091,13 @@ function todayStr() {
     const rec = sanitizeRecord({
       id: r.id, item,
       product: $('edit-product').value.trim(),
-      price: $('edit-price').value, size: $('edit-size').value, unit: $('edit-unit').value, count: $('edit-count').value.trim() || '1',
+      price: $('edit-price').value, size: $('edit-size').value, unit: $('edit-unit').value,
       shop: $('edit-shop').value.trim(),
       sale: $('edit-sale').checked,
       memo: $('edit-memo').value,
       date: r.date   // 編集（修正）では記録日は変えない
     });
-    if (!rec) { showError('edit-error', '価格・容量・入数を正しく入力してください'); return; }
+    if (!rec) { showError('edit-error', '価格・容量を正しく入力してください'); return; }
     const before = records;
     records = records.map((x) => (x === r ? rec : x));
     if (!persist()) { records = before; return; }
@@ -903,10 +1118,9 @@ function todayStr() {
     $('rc-summary').innerHTML =
       '<div>記録：' + esc(r.item) + (r.product ? '（' + esc(r.product) + '）' : '') + '</div>' +
       '<div class="big">' + esc(formatUnitPrice(up)) + '</div>' +
-      '<div class="rec-sub">' + esc(describeQty(r.price, r.size, r.unit, r.count)) + (r.shop ? '　' + esc(r.shop) : '') + '</div>';
+      '<div class="rec-sub">' + esc(describeQty(r.price, r.size, r.unit)) + (r.shop ? '　' + esc(r.shop) : '') + '</div>';
     $('rc-price').value = '';
     $('rc-size').value = '';
-    $('rc-count').value = '1';
     fillUnitSelect($('rc-unit'), unitsOfKind(up.kind), r.unit);   // 記録と同じ種類の単位だけ選べる
     updateRCompare();
     openSheet('sheet-rcompare');
@@ -916,7 +1130,7 @@ function todayStr() {
     const r = findRec(currentId);
     if (!r) return;
     const recUp = recordUnitPrice(r);
-    const nowUp = calcUnitPrice($('rc-price').value, $('rc-size').value, $('rc-unit').value, $('rc-count').value);
+    const nowUp = calcUnitPrice($('rc-price').value, $('rc-size').value, $('rc-unit').value);
     const res = $('rc-result');
     $('rc-unitprice').innerHTML = nowUp ? '目の前の商品：<strong>' + formatYen(nowUp) + '</strong>円/' + esc(nowUp.base) : '';
     $('btn-rc-update').classList.add('hidden');
@@ -932,20 +1146,20 @@ function todayStr() {
       res.textContent = '記録と同じ単価です';
     } else if (c.cheaper === 'a') {
       res.className = 'result good';
-      res.textContent = '記録より1' + c.base + 'あたり' + c.diffText + '安い！（' + c.pctText + 'お得）';
+      res.textContent = '記録より' + c.per + c.diffText + '安い！（' + c.pctText + 'お得）';
       $('btn-rc-update').classList.remove('hidden');   // 記録より安ければ更新へ進める
     } else {
       res.className = 'result warn';
-      res.textContent = '記録のほうが' + c.pctText + 'お得（1' + c.base + 'あたり' + c.diffText + '安い）';
+      res.textContent = '記録のほうが' + c.pctText + 'お得（' + c.per + c.diffText + '安い）';
     }
   }
-  ['rc-price', 'rc-size', 'rc-count'].forEach((id) => $(id).addEventListener('input', updateRCompare));
+  ['rc-price', 'rc-size'].forEach((id) => $(id).addEventListener('input', updateRCompare));
   $('rc-unit').addEventListener('change', updateRCompare);
 
   $('btn-rc-update').addEventListener('click', () => {
     const r = findRec(currentId);
     if (!r) return;
-    openSave({ price: $('rc-price').value, size: $('rc-size').value, unit: $('rc-unit').value, count: $('rc-count').value }, r.item);
+    openSave({ price: $('rc-price').value, size: $('rc-size').value, unit: $('rc-unit').value }, r.item);
   });
 
   // ---------- 起動 ----------
