@@ -19,14 +19,12 @@
     --bg: #f4f6f5; --card: #ffffff; --text: #1c1f1e; --sub: #5f6b66; --line: #d6ddda;
     --accent: #16a34a; --accent-text: #ffffff; --good-bg: #e7f8ee; --good-line: #16a34a;
     --warn-bg: #fff4e0; --warn-text: #8a5300; --danger: #d43c3c; --input-bg: #ffffff;
-    --sale: #e5484d;
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #111413; --card: #1c201f; --text: #eef2f0; --sub: #9aa7a1; --line: #343b38;
       --accent: #22c55e; --accent-text: #08210f; --good-bg: #153522; --good-line: #22c55e;
       --warn-bg: #3a2c12; --warn-text: #f3c77a; --danger: #ff6b6b; --input-bg: #141716;
-      --sale: #ff6b6b;
     }
   }
 
@@ -152,10 +150,6 @@
   .rec-item { font-weight: 700; font-size: 18px; overflow-wrap: anywhere; }
   .rec-price { font-weight: 700; color: var(--accent); white-space: nowrap; }
   .rec-sub { color: var(--sub); font-size: 14px; margin-top: 2px; overflow-wrap: anywhere; }
-  .sale {
-    display: inline-block; font-size: 12px; font-weight: 700; color: #fff; background: var(--sale);
-    border-radius: 6px; padding: 1px 6px; margin-left: 6px; vertical-align: 2px;
-  }
   .empty { text-align: center; color: var(--sub); padding: 40px 10px; }
 
   /* ===== 下部タブ ===== */
@@ -189,8 +183,6 @@
   }
   .summary .big { font-size: 22px; font-weight: 700; color: var(--accent); }
   .error { color: var(--danger); font-weight: 600; margin: 8px 0; }
-  .switch { display: flex; align-items: center; gap: 12px; min-height: 50px; font-size: 17px; color: var(--text); }
-  .switch input { width: 28px; height: 28px; accent-color: var(--accent); }
   dl.detail { margin: 0 0 14px; background: var(--card); border: 1.5px solid var(--line); border-radius: 12px; padding: 4px 14px; }
   dl.detail div { display: flex; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line); }
   dl.detail div:last-child { border-bottom: 0; }
@@ -251,7 +243,6 @@
       <input type="text" id="save-product" placeholder="例：〇〇牛乳 1L" autocomplete="off"></div>
     <div class="field"><label for="save-shop">お店</label>
       <input type="text" id="save-shop" list="dl-shops" autocomplete="off"></div>
-    <label class="switch"><input type="checkbox" id="save-sale">セール品</label>
     <div class="field"><label for="save-memo">メモ</label>
       <textarea id="save-memo"></textarea></div>
     <div id="save-error" class="error hidden"></div>
@@ -293,7 +284,6 @@
     </div>
     <div class="field"><label for="edit-shop">お店</label>
       <input type="text" id="edit-shop" list="dl-shops" autocomplete="off"></div>
-    <label class="switch"><input type="checkbox" id="edit-sale">セール品</label>
     <div class="field"><label for="edit-memo">メモ</label>
       <textarea id="edit-memo"></textarea></div>
     <div id="edit-preview" class="summary"></div>
@@ -518,7 +508,6 @@ function sanitizeRecord(r) {
     unit: r.unit,
     unitPrice: Number(formatYen(up)),   // 表示用の参考値（判定は毎回計算し直す）
     shop: str(r.shop),
-    sale: r.sale === true,
     memo: str(r.memo),
     date: /^\d{4}-\d{2}-\d{2}$/.test(r.date) ? r.date : todayStr()
   };
@@ -894,9 +883,11 @@ function todayStr() {
   SIDES.forEach((s) => {
     ['price', 'size'].forEach((f) => $(s + '-' + f).addEventListener('input', updateCompare));
     $(s + '-unit').addEventListener('change', () => {
-      // もう片方が未入力なら、単位を合わせておく（入力の手間を減らす）
+      // もう片方の単位を連動させる：未入力のとき、または単位の種類が違うとき（g→ml など）は同じ単位にする
+      // 同じ種類どうし（g と kg など）はそのまま残し、換算して比べられるようにする
       const other = s === 'a' ? 'b' : 'a';
-      if (isEmptySide(other)) $(other + '-unit').value = $(s + '-unit').value;
+      const u = $(s + '-unit').value;
+      if (isEmptySide(other) || UNITS[$(other + '-unit').value].kind !== UNITS[u].kind) $(other + '-unit').value = u;
       updateCompare();
     });
     $(s + '-record').addEventListener('click', () => {
@@ -932,7 +923,6 @@ function todayStr() {
     $('save-item').value = itemName || '';
     $('save-product').value = '';
     $('save-shop').value = '';
-    $('save-sale').checked = false;
     $('save-memo').value = '';
     $('save-error').classList.add('hidden');
     renderDatalists();
@@ -969,7 +959,6 @@ function todayStr() {
       product: $('save-product').value.trim(),
       price: d.price, size: d.size, unit: d.unit,
       shop: $('save-shop').value.trim(),
-      sale: $('save-sale').checked,
       memo: $('save-memo').value,
       date: todayStr()
     });
@@ -1004,7 +993,7 @@ function todayStr() {
     list.innerHTML = hits.map((r) => {
       const up = recordUnitPrice(r);
       return '<button type="button" class="rec" data-id="' + esc(r.id) + '">' +
-        '<div class="rec-top"><span class="rec-item">' + esc(r.item) + (r.sale ? '<span class="sale">セール</span>' : '') + '</span>' +
+        '<div class="rec-top"><span class="rec-item">' + esc(r.item) + '</span>' +
         '<span class="rec-price">' + esc(formatUnitPrice(up)) + '</span></div>' +
         '<div class="rec-sub">' + esc(r.shop || 'お店未入力') + (r.product ? '　' + esc(r.product) : '') + '</div>' +
         '</button>';
@@ -1032,7 +1021,6 @@ function todayStr() {
       ['価格', fmtNum(r.price) + '円'],
       ['容量', fmtSize(r.size, r.unit)],
       ['お店', r.shop || '—'],
-      ['セール品', r.sale ? 'はい' : 'いいえ'],
       ['メモ', r.memo || '—'],
       ['記録日', r.date]
     ];
@@ -1062,7 +1050,6 @@ function todayStr() {
     $('edit-size').value = fmtNum(r.size);
     fillUnitSelect($('edit-unit'), unitsOfKind(UNITS[r.unit].kind), r.unit);   // 同じ種類の単位だけ選べる
     $('edit-shop').value = r.shop;
-    $('edit-sale').checked = r.sale;
     $('edit-memo').value = r.memo;
     $('edit-error').classList.add('hidden');
     renderDatalists();
@@ -1093,7 +1080,6 @@ function todayStr() {
       product: $('edit-product').value.trim(),
       price: $('edit-price').value, size: $('edit-size').value, unit: $('edit-unit').value,
       shop: $('edit-shop').value.trim(),
-      sale: $('edit-sale').checked,
       memo: $('edit-memo').value,
       date: r.date   // 編集（修正）では記録日は変えない
     });
