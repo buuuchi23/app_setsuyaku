@@ -1,0 +1,16 @@
+{
+  "name": "単価比較＆ベスト記録",
+  "short_name": "単価比較",
+  "description": "2商品の単価を比べて、品目ごとに一番お得な商品を記録するアプリ",
+  "lang": "ja",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f4f6f5",
+  "theme_color": "#16a34a",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
