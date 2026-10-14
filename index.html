@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>単価比較</title>
+<meta name="theme-color" content="#16a34a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="単価比較">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+  /* ===== 色（ライト／ダーク） ===== */
+  :root {
+    --bg: #f4f6f5; --card: #ffffff; --text: #1c1f1e; --sub: #5f6b66; --line: #d6ddda;
+    --accent: #16a34a; --accent-text: #ffffff; --good-bg: #e7f8ee; --good-line: #16a34a;
+    --warn-bg: #fff4e0; --warn-text: #8a5300; --danger: #d43c3c; --input-bg: #ffffff;
+    --sale: #e5484d;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111413; --card: #1c201f; --text: #eef2f0; --sub: #9aa7a1; --line: #343b38;
+      --accent: #22c55e; --accent-text: #08210f; --good-bg: #153522; --good-line: #22c55e;
+      --warn-bg: #3a2c12; --warn-text: #f3c77a; --danger: #ff6b6b; --input-bg: #141716;
+      --sale: #ff6b6b;
+    }
+  }
+
+  /* ===== 基本 ===== */
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+    font-size: 17px; line-height: 1.5;
+    -webkit-tap-highlight-color: transparent;
+  }
+  header {
+    position: sticky; top: 0; z-index: 5; background: var(--bg);
+    padding: calc(env(safe-area-inset-top) + 10px) 16px 8px;
+  }
+  header h1 { margin: 0 auto; max-width: 720px; font-size: 20px; }
+  main {
+    max-width: 720px; margin: 0 auto;
+    padding: 4px 16px calc(env(safe-area-inset-bottom) + 96px);
+  }
+  .hidden { display: none !important; }
+
+  /* ===== 入力欄・ボタン（片手で押しやすい大きさ） ===== */
+  label { display: block; font-size: 14px; color: var(--sub); margin-bottom: 4px; }
+  input[type="text"], input[type="search"], select, textarea {
+    width: 100%; min-height: 50px; padding: 10px 12px; font-size: 18px;
+    color: var(--text); background: var(--input-bg);
+    border: 1.5px solid var(--line); border-radius: 12px;
+    -webkit-appearance: none; appearance: none;
+  }
+  select {
+    background-image: linear-gradient(45deg, transparent 50%, var(--sub) 50%), linear-gradient(135deg, var(--sub) 50%, transparent 50%);
+    background-position: calc(100% - 18px) 22px, calc(100% - 12px) 22px;
+    background-size: 6px 6px; background-repeat: no-repeat; padding-right: 30px;
+  }
+  textarea { min-height: 80px; resize: vertical; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    min-height: 50px; padding: 0 18px; font-size: 17px; font-weight: 600;
+    border-radius: 12px; border: 1.5px solid var(--line);
+    background: var(--card); color: var(--text); cursor: pointer;
+  }
+  .btn:active { opacity: .7; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+  .btn.danger { color: var(--danger); border-color: var(--danger); background: transparent; }
+  .btn.block { width: 100%; }
+  .row { display: flex; gap: 10px; }
+  .row > * { flex: 1; min-width: 0; }
+  .field { margin-bottom: 12px; }
+
+  /* ===== 比較タブ ===== */
+  .products { display: grid; gap: 12px; }
+  @media (min-width: 700px) { .products { grid-template-columns: 1fr 1fr; } }
+  .card {
+    background: var(--card); border: 2px solid var(--line); border-radius: 16px; padding: 14px;
+  }
+  .card.best { border-color: var(--good-line); background: var(--good-bg); }
+  .card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; min-height: 30px; }
+  .card-head h2 { margin: 0; font-size: 18px; }
+  .badge {
+    display: inline-block; padding: 3px 12px; border-radius: 999px;
+    background: var(--accent); color: var(--accent-text); font-weight: 700; font-size: 15px;
+  }
+  .size-row { display: grid; grid-template-columns: 1fr 104px; gap: 10px; }
+  .unit-price { margin: 4px 0 8px; font-size: 15px; color: var(--sub); }
+  .unit-price strong { font-size: 26px; color: var(--text); margin-right: 4px; }
+  .card.best .unit-price strong { color: var(--good-line); }
+  .result {
+    margin: 14px 0; padding: 14px; border-radius: 14px; background: var(--card);
+    border: 1.5px solid var(--line); font-size: 18px; font-weight: 600; text-align: center;
+  }
+  .result.good { background: var(--good-bg); border-color: var(--good-line); }
+  .result.warn { background: var(--warn-bg); border-color: var(--warn-bg); color: var(--warn-text); }
+  .result.muted { color: var(--sub); font-weight: 400; font-size: 16px; }
+  /* 比較の判定は、スクロールしても下部タブの上に常に見えるようにする */
+  #cmp-result {
+    position: sticky; z-index: 4; bottom: calc(env(safe-area-inset-bottom) + 70px);
+    box-shadow: 0 4px 16px rgba(0,0,0,.12);
+  }
+  #cmp-result.muted { background: var(--card); }
+  .price-row { display: grid; grid-template-columns: 1fr 104px; gap: 10px; }
+
+  /* ===== 記録タブ ===== */
+  .list { display: grid; gap: 10px; margin-top: 12px; }
+  @media (min-width: 700px) { .list { grid-template-columns: 1fr 1fr; } }
+  .rec {
+    display: block; width: 100%; text-align: left; cursor: pointer; font: inherit; color: inherit;
+    background: var(--card); border: 1.5px solid var(--line); border-radius: 14px; padding: 12px 14px;
+  }
+  .rec:active { opacity: .7; }
+  .rec-top { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+  .rec-item { font-weight: 700; font-size: 18px; overflow-wrap: anywhere; }
+  .rec-price { font-weight: 700; color: var(--accent); white-space: nowrap; }
+  .rec-sub { color: var(--sub); font-size: 14px; margin-top: 2px; overflow-wrap: anywhere; }
+  .sale {
+    display: inline-block; font-size: 12px; font-weight: 700; color: #fff; background: var(--sale);
+    border-radius: 6px; padding: 1px 6px; margin-left: 6px; vertical-align: 2px;
+  }
+  .empty { text-align: center; color: var(--sub); padding: 40px 10px; }
+
+  /* ===== 下部タブ ===== */
+  nav.tabs {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+    display: flex; background: var(--card); border-top: 1px solid var(--line);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  nav.tabs button {
+    flex: 1; min-height: 60px; font-size: 16px; font-weight: 700; border: 0; background: none;
+    color: var(--sub); cursor: pointer;
+  }
+  nav.tabs button[aria-selected="true"] { color: var(--accent); box-shadow: inset 0 3px 0 var(--accent); }
+
+  /* ===== 下から出るシート ===== */
+  .overlay {
+    position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,.45);
+    display: flex; align-items: flex-end; justify-content: center;
+  }
+  .sheet {
+    width: 100%; max-width: 720px; max-height: 92vh; overflow-y: auto; -webkit-overflow-scrolling: touch;
+    background: var(--bg); border-radius: 20px 20px 0 0;
+    padding: 16px 16px calc(env(safe-area-inset-bottom) + 20px);
+  }
+  .sheet-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .sheet-head h2 { margin: 0; font-size: 20px; }
+  .close { min-height: 44px; padding: 0 14px; }
+  .summary {
+    background: var(--card); border: 1.5px solid var(--line); border-radius: 12px;
+    padding: 10px 14px; margin-bottom: 14px;
+  }
+  .summary .big { font-size: 22px; font-weight: 700; color: var(--accent); }
+  .error { color: var(--danger); font-weight: 600; margin: 8px 0; }
+  .switch { display: flex; align-items: center; gap: 12px; min-height: 50px; font-size: 17px; color: var(--text); }
+  .switch input { width: 28px; height: 28px; accent-color: var(--accent); }
+  dl.detail { margin: 0 0 14px; background: var(--card); border: 1.5px solid var(--line); border-radius: 12px; padding: 4px 14px; }
+  dl.detail div { display: flex; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+  dl.detail div:last-child { border-bottom: 0; }
+  dl.detail dt { width: 6.5em; flex-shrink: 0; color: var(--sub); font-size: 15px; }
+  dl.detail dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+  .stack { display: grid; gap: 10px; }
+
+  /* ===== お知らせ（トースト） ===== */
+  .toast {
+    position: fixed; left: 50%; transform: translateX(-50%); z-index: 30;
+    bottom: calc(env(safe-area-inset-bottom) + 76px);
+    background: #222; color: #fff; padding: 10px 18px; border-radius: 999px; font-size: 15px;
+    max-width: 90vw;
+  }
+</style>
+</head>
+<body>
+
+<header><h1 id="title">単価比較</h1></header>
+
+<main>
+  <!-- ========== 比較タブ ========== -->
+  <section id="tab-compare">
+    <div class="products">
+      <!-- 商品A・Bの入力カードは同じ形なのでJSで作る -->
+    </div>
+    <div id="cmp-result" class="result muted">価格と容量を入れると単価を計算します</div>
+    <button type="button" id="btn-clear" class="btn block">クリア</button>
+  </section>
+
+  <!-- ========== 記録タブ ========== -->
+  <section id="tab-records" class="hidden">
+    <input type="search" id="search" placeholder="品目名・商品名・お店で検索" autocomplete="off">
+    <div id="rec-list" class="list"></div>
+  </section>
+</main>
+
+<nav class="tabs" role="tablist">
+  <button type="button" role="tab" data-tab="compare" aria-selected="true">比較</button>
+  <button type="button" role="tab" data-tab="records" aria-selected="false">記録</button>
+</nav>
+
+<!-- 候補表示用リスト -->
+<datalist id="dl-items"></datalist>
+<datalist id="dl-shops"></datalist>
+
+<!-- ========== シート：記録の保存 ========== -->
+<div id="sheet-save" class="overlay hidden">
+  <div class="sheet" role="dialog" aria-labelledby="save-title">
+    <div class="sheet-head">
+      <h2 id="save-title">ベスト記録に保存</h2>
+      <button type="button" class="btn close" data-close>閉じる</button>
+    </div>
+    <div id="save-summary" class="summary"></div>
+    <div class="field"><label for="save-item">品目名（必須）</label>
+      <input type="text" id="save-item" list="dl-items" placeholder="例：牛乳、トイレットペーパー" autocomplete="off"></div>
+    <div class="field"><label for="save-product">商品名</label>
+      <input type="text" id="save-product" placeholder="例：〇〇牛乳 1L" autocomplete="off"></div>
+    <div class="field"><label for="save-shop">お店</label>
+      <input type="text" id="save-shop" list="dl-shops" autocomplete="off"></div>
+    <label class="switch"><input type="checkbox" id="save-sale">セール品</label>
+    <div class="field"><label for="save-memo">メモ</label>
+      <textarea id="save-memo"></textarea></div>
+    <div id="save-error" class="error hidden"></div>
+    <button type="button" id="btn-save" class="btn primary block">保存する</button>
+  </div>
+</div>
+
+<!-- ========== シート：記録の詳細 ========== -->
+<div id="sheet-detail" class="overlay hidden">
+  <div class="sheet" role="dialog" aria-labelledby="detail-title">
+    <div class="sheet-head">
+      <h2 id="detail-title">記録の詳細</h2>
+      <button type="button" class="btn close" data-close>閉じる</button>
+    </div>
+    <dl id="detail-body" class="detail"></dl>
+    <div class="stack">
+      <button type="button" id="btn-to-rcompare" class="btn primary block">この記録と比べる</button>
+      <button type="button" id="btn-to-edit" class="btn block">編集</button>
+      <button type="button" id="btn-delete" class="btn danger block">削除</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== シート：記録の編集 ========== -->
+<div id="sheet-edit" class="overlay hidden">
+  <div class="sheet" role="dialog" aria-labelledby="edit-title">
+    <div class="sheet-head">
+      <h2 id="edit-title">記録の編集</h2>
+      <button type="button" class="btn close" data-close>閉じる</button>
+    </div>
+    <div class="field"><label for="edit-item">品目名（必須）</label>
+      <input type="text" id="edit-item" list="dl-items" autocomplete="off"></div>
+    <div class="field"><label for="edit-product">商品名</label>
+      <input type="text" id="edit-product" autocomplete="off"></div>
+    <div class="field"><label for="edit-price">価格（円）</label>
+      <input type="text" id="edit-price" inputmode="decimal" autocomplete="off"></div>
+    <div class="field size-row">
+      <div><label for="edit-size">容量</label><input type="text" id="edit-size" inputmode="decimal" autocomplete="off"></div>
+      <div><label for="edit-unit">単位</label><select id="edit-unit"></select></div>
+    </div>
+    <div class="field"><label for="edit-count">入数</label>
+      <input type="text" id="edit-count" inputmode="decimal" autocomplete="off"></div>
+    <div class="field"><label for="edit-shop">お店</label>
+      <input type="text" id="edit-shop" list="dl-shops" autocomplete="off"></div>
+    <label class="switch"><input type="checkbox" id="edit-sale">セール品</label>
+    <div class="field"><label for="edit-memo">メモ</label>
+      <textarea id="edit-memo"></textarea></div>
+    <div id="edit-preview" class="summary"></div>
+    <div id="edit-error" class="error hidden"></div>
+    <button type="button" id="btn-edit-save" class="btn primary block">変更を保存</button>
+  </div>
+</div>
+
+<!-- ========== シート：記録と目の前の商品を比べる ========== -->
+<div id="sheet-rcompare" class="overlay hidden">
+  <div class="sheet" role="dialog" aria-labelledby="rc-title">
+    <div class="sheet-head">
+      <h2 id="rc-title">記録と比べる</h2>
+      <button type="button" class="btn close" data-close>閉じる</button>
+    </div>
+    <div id="rc-summary" class="summary"></div>
+    <div class="field"><label for="rc-price">目の前の商品の価格（円）</label>
+      <input type="text" id="rc-price" inputmode="decimal" autocomplete="off"></div>
+    <div class="field size-row">
+      <div><label for="rc-size">容量</label><input type="text" id="rc-size" inputmode="decimal" autocomplete="off"></div>
+      <div><label for="rc-unit">単位</label><select id="rc-unit"></select></div>
+    </div>
+    <div class="field"><label for="rc-count">入数</label>
+      <input type="text" id="rc-count" inputmode="decimal" value="1" autocomplete="off"></div>
+    <div id="rc-unitprice" class="unit-price"></div>
+    <div id="rc-result" class="result muted">価格と容量を入れると記録と比べます</div>
+    <button type="button" id="btn-rc-update" class="btn primary block hidden">この商品で記録を更新</button>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden" role="status"></div>
+
+<!-- ===================== 計算ロジック（画面に依存しない純粋な関数） ===================== -->
+<script id="calc-logic">
+// 浮動小数の誤差を避けるため、数値はすべて「分子n / 分母d」の分数（BigInt）で扱う
+
+// 単位の定義：kind=種類、base=表示の基準単位、n/d=基準単位への倍率（分数）
+const UNITS = {
+  'g':    { kind: 'weight', base: 'g',    n: 1n,    d: 1n },
+  'kg':   { kind: 'weight', base: 'g',    n: 1000n, d: 1n },   // kg→g
+  'ml':   { kind: 'volume', base: 'ml',   n: 1n,    d: 1n },
+  'L':    { kind: 'volume', base: 'ml',   n: 1000n, d: 1n },   // L→ml
+  'm':    { kind: 'length', base: 'm',    n: 1n,    d: 1n },
+  'cm':   { kind: 'length', base: 'm',    n: 1n,    d: 100n }, // cm→m
+  '個':   { kind: 'piece',  base: '個',   n: 1n,    d: 1n },
+  '枚':   { kind: 'sheet',  base: '枚',   n: 1n,    d: 1n },
+  'ロール': { kind: 'roll', base: 'ロール', n: 1n,    d: 1n }
+};
+const UNIT_LIST = Object.keys(UNITS);
+const KIND_NAMES = {
+  weight: '重さ（g・kg）', volume: '容量（ml・L）', length: '長さ（m・cm）',
+  piece: '個数（個）', sheet: '枚数（枚）', roll: 'ロール数（ロール）'
+};
+
+// 入力文字列 → 正の分数 {n, d}。全角数字・カンマ可。0以下や数字以外は null
+function parseDecimal(v) {
+  if (v === null || v === undefined) return null;
+  let s = String(v).normalize('NFKC').replace(/[,\s]/g, '');
+  if (s.startsWith('.')) s = '0' + s;
+  if (!/^\d{1,9}(\.\d{1,6})?$/.test(s)) return null;
+  const [i, f = ''] = s.split('.');
+  const n = BigInt(i + f);
+  if (n === 0n) return null;
+  return { n, d: 10n ** BigInt(f.length) };
+}
+
+// 単価を計算：価格 ÷（容量 × 入数 × 単位の倍率）。入数が空なら1
+function calcUnitPrice(price, size, unit, count) {
+  const u = UNITS[unit];
+  if (!u) return null;
+  const p = parseDecimal(price);
+  const s = parseDecimal(size);
+  const c = (count === '' || count === null || count === undefined) ? { n: 1n, d: 1n } : parseDecimal(count);
+  if (!p || !s || !c) return null;
+  return {
+    n: p.n * s.d * c.d * u.d,
+    d: p.d * s.n * c.n * u.n,
+    kind: u.kind,
+    base: u.base
+  };
+}
+
+// 分数の大小比較（-1: a<b, 0: 同じ, 1: a>b）
+function cmpFrac(a, b) {
+  const l = a.n * b.d, r = b.n * a.d;
+  return l < r ? -1 : (l > r ? 1 : 0);
+}
+
+// 正の分数を小数第digits位で四捨五入し、10^digits 倍した整数で返す
+function roundFrac(f, digits) {
+  const m = 10n ** BigInt(digits);
+  return (f.n * m * 2n + f.d) / (2n * f.d);
+}
+
+// 四捨五入した整数を "1.99" のような文字列にする
+function formatScaled(v, digits) {
+  if (digits === 0) return v.toString();
+  const m = 10n ** BigInt(digits);
+  return (v / m).toString() + '.' + (v % m).toString().padStart(digits, '0');
+}
+
+// 単価の表示用文字列（小数第2位まで）："1.99"
+function formatYen(f) { return formatScaled(roundFrac(f, 2), 2); }
+
+// 単価＋単位の表示："1.99円/m"
+function formatUnitPrice(up) { return formatYen(up) + '円/' + up.base; }
+
+// 2つの単価を比べる。
+// 戻り値 status: 'invalid'（未入力）/ 'kind'（単位の種類違い）/ 'same'（同じ）/ 'diff'（差あり）
+//   diff のとき cheaper: 'a' か 'b'、diffText: "0.34円" か "0.01円未満"、pctText: "約15%" か "1%未満"
+function compareUnitPrices(a, b) {
+  if (!a || !b) return { status: 'invalid' };
+  if (a.kind !== b.kind) return { status: 'kind' };
+  const c = cmpFrac(a, b);
+  if (c === 0) return { status: 'same', base: a.base };
+  const lo = c < 0 ? a : b;
+  const hi = c < 0 ? b : a;
+  // 差額 = 高い単価 − 安い単価
+  const diff = { n: hi.n * lo.d - lo.n * hi.d, d: hi.d * lo.d };
+  const diffR = roundFrac(diff, 2);
+  const diffText = diffR === 0n ? '0.01円未満' : formatScaled(diffR, 2) + '円';
+  // お得率 = 差額 ÷ 高い単価 × 100（整数に四捨五入）
+  const pct = roundFrac({ n: diff.n * hi.d * 100n, d: diff.d * hi.n }, 0);
+  const pctText = pct === 0n ? '1%未満' : '約' + pct.toString() + '%';
+  return { status: 'diff', cheaper: c < 0 ? 'a' : 'b', base: a.base, diffText, pctText };
+}
+
+// 品目名の一致判定用（前後の空白・全角半角・大文字小文字の違いを無視）
+function normName(s) {
+  return String(s || '').normalize('NFKC').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+// 保存データ1件を検査して、正しい形に整える。直せないものは null
+function sanitizeRecord(r) {
+  if (!r || typeof r !== 'object' || Array.isArray(r)) return null;
+  const str = (v) => (typeof v === 'string' ? v : '');
+  const item = str(r.item).trim();
+  if (!item || !UNITS[r.unit]) return null;
+  const count = (r.count === undefined || r.count === null || r.count === '') ? 1 : r.count;
+  const up = calcUnitPrice(String(r.price), String(r.size), r.unit, String(count));
+  if (!up) return null;
+  return {
+    id: (typeof r.id === 'string' && r.id) ? r.id : newId(),
+    item,
+    product: str(r.product),
+    price: Number(String(r.price).normalize('NFKC').replace(/,/g, '')),
+    size: Number(String(r.size).normalize('NFKC').replace(/,/g, '')),
+    unit: r.unit,
+    count: Number(String(count).normalize('NFKC').replace(/,/g, '')),
+    unitPrice: Number(formatYen(up)),   // 表示用の参考値（判定は毎回計算し直す）
+    shop: str(r.shop),
+    sale: r.sale === true,
+    memo: str(r.memo),
+    date: /^\d{4}-\d{2}-\d{2}$/.test(r.date) ? r.date : todayStr()
+  };
+}
+
+// 保存用の文字列（JSON）から記録一覧を読み込む。壊れていても必ず配列を返す
+function parseRecords(raw) {
+  if (!raw) return { records: [], broken: false };
+  let data;
+  try { data = JSON.parse(raw); } catch (e) { return { records: [], broken: true }; }
+  if (!Array.isArray(data)) return { records: [], broken: true };
+  const records = [];
+  const seen = new Set();
+  for (const r of data) {
+    const v = sanitizeRecord(r);
+    if (!v) continue;
+    const key = normName(v.item);
+    if (seen.has(key)) continue;   // 同じ品目が重複していたら先頭の1件だけ残す
+    seen.add(key);
+    records.push(v);
+  }
+  return { records, broken: records.length !== data.length };
+}
+
+// 記録の単価（分数）
+function recordUnitPrice(r) { return calcUnitPrice(String(r.price), String(r.size), r.unit, String(r.count)); }
+
+// 保存時の更新ルール判定
+// 戻り値 action: 'new'（新規保存）/ 'kind'（種類違いで保存不可）/ 'cheaper'（安い→更新確認）/ 'notCheaper'（高い・同じ→上書き確認）
+function judgeSave(records, itemName, newUp) {
+  const key = normName(itemName);
+  const existing = records.find((r) => normName(r.item) === key);
+  if (!existing) return { action: 'new' };
+  const oldUp = recordUnitPrice(existing);
+  if (!oldUp || oldUp.kind !== newUp.kind) return { action: 'kind', existing, oldUp };
+  if (cmpFrac(newUp, oldUp) < 0) {
+    return { action: 'cheaper', existing, oldUp, message: '今の記録（' + formatUnitPrice(oldUp) + '）より安いです。更新しますか？' };
+  }
+  return { action: 'notCheaper', existing, oldUp, message: '今の記録のほうがお得です。それでも上書きしますか？' };
+}
+
+function newId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+function todayStr() {
+  const t = new Date();
+  return t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0');
+}
+</script>
+
+<!-- ===================== 画面の動き ===================== -->
+<script>
+(function () {
+  'use strict';
+  const STORE_KEY = 'tankaApp.records.v1';
+  const SUGGEST_KEY = 'tankaApp.suggest.v1';
+  const $ = (id) => document.getElementById(id);
+
+  // ---------- 保存データの読み書き（失敗してもアプリは止めない） ----------
+  function storageGet(key) {
+    try { return localStorage.getItem(key); } catch (e) { return null; }
+  }
+  function storageSet(key, value) {
+    try { localStorage.setItem(key, value); return true; } catch (e) { return false; }
+  }
+
+  let records = [];
+  (function loadRecords() {
+    const raw = storageGet(STORE_KEY);
+    const res = parseRecords(raw);
+    records = res.records;
+    if (res.broken) {
+      // 壊れていた元データは別の場所に退避しておく（消してしまわない）
+      storageSet(STORE_KEY + '.broken', raw);
+      storageSet(STORE_KEY, JSON.stringify(records));
+    }
+  })();
+
+  function persist() {
+    if (!storageSet(STORE_KEY, JSON.stringify(records))) {
+      showToast('保存できませんでした（端末の保存領域を確認してください）');
+      return false;
+    }
+    return true;
+  }
+
+  // 過去に入力した品目名・お店の候補（記録を上書き・削除しても候補は残す）
+  let suggest = { items: [], shops: [] };
+  (function loadSuggest() {
+    try {
+      const s = JSON.parse(storageGet(SUGGEST_KEY) || '{}');
+      const clean = (a) => Array.isArray(a) ? a.filter((x) => typeof x === 'string' && x.trim()).slice(0, 200) : [];
+      suggest = { items: clean(s && s.items), shops: clean(s && s.shops) };
+    } catch (e) { suggest = { items: [], shops: [] }; }
+  })();
+
+  function addSuggest(type, value) {
+    const v = (value || '').trim();
+    if (!v) return;
+    suggest[type] = [v].concat(suggest[type].filter((x) => normName(x) !== normName(v))).slice(0, 200);
+    storageSet(SUGGEST_KEY, JSON.stringify(suggest));
+  }
+
+  function renderDatalists() {
+    const fill = (el, values) => {
+      el.innerHTML = '';
+      const seen = new Set();
+      values.forEach((v) => {
+        const k = normName(v);
+        if (!v || seen.has(k)) return;
+        seen.add(k);
+        const o = document.createElement('option');
+        o.value = v;
+        el.appendChild(o);
+      });
+    };
+    fill($('dl-items'), records.map((r) => r.item).concat(suggest.items));
+    fill($('dl-shops'), records.map((r) => r.shop).concat(suggest.shops));
+  }
+
+  // ---------- 共通の小物 ----------
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  let toastTimer = null;
+  function showToast(msg) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.classList.remove('hidden');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.add('hidden'), 2200);
+  }
+
+  function fillUnitSelect(sel, units, selected) {
+    sel.innerHTML = '';
+    units.forEach((u) => {
+      const o = document.createElement('option');
+      o.value = u; o.textContent = u;
+      sel.appendChild(o);
+    });
+    sel.value = units.includes(selected) ? selected : units[0];
+  }
+  const unitsOfKind = (kind) => UNIT_LIST.filter((u) => UNITS[u].kind === kind);
+
+  // 数値の表示（入力された形をなるべくそのまま）
+  const fmtNum = (n) => String(n);
+  // "398円 / 50m × 4"
+  function describeQty(price, size, unit, count) {
+    const c = String(count === '' || count == null ? '1' : count).normalize('NFKC');
+    return String(price).normalize('NFKC') + '円 / ' + String(size).normalize('NFKC') + unit + (c !== '1' ? ' × ' + c : '');
+  }
+
+  // ---------- シート（下から出る画面）の開け閉め ----------
+  function openSheet(id) {
+    document.querySelectorAll('.overlay').forEach((o) => o.classList.add('hidden'));
+    $(id).classList.remove('hidden');
+    $(id).querySelector('.sheet').scrollTop = 0;
+  }
+  function closeSheets() {
+    document.querySelectorAll('.overlay').forEach((o) => o.classList.add('hidden'));
+  }
+  document.querySelectorAll('[data-close]').forEach((b) => b.addEventListener('click', closeSheets));
+  // 背景の暗い部分をタップしても閉じる
+  document.querySelectorAll('.overlay').forEach((o) => o.addEventListener('click', (e) => { if (e.target === o) closeSheets(); }));
+
+  // ---------- タブ切り替え ----------
+  function switchTab(name) {
+    document.querySelectorAll('nav.tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === name)));
+    $('tab-compare').classList.toggle('hidden', name !== 'compare');
+    $('tab-records').classList.toggle('hidden', name !== 'records');
+    $('title').textContent = name === 'compare' ? '単価比較' : 'ベスト記録';
+    if (name === 'records') renderList();
+    window.scrollTo(0, 0);
+  }
+  document.querySelectorAll('nav.tabs button').forEach((b) => b.addEventListener('click', () => switchTab(b.dataset.tab)));
+
+  // =====================================================================
+  // 比較タブ
+  // =====================================================================
+  const SIDES = ['a', 'b'];
+  const productsEl = document.querySelector('.products');
+  SIDES.forEach((s) => {
+    const L = s.toUpperCase();
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.id = 'card-' + s;
+    card.innerHTML =
+      '<div class="card-head"><h2>商品' + L + '</h2><span class="badge hidden" id="badge-' + s + '">お得！</span></div>' +
+      '<div class="field price-row">' +
+        '<div><label for="' + s + '-price">価格（円）</label><input type="text" id="' + s + '-price" inputmode="decimal" autocomplete="off" placeholder="例：398"></div>' +
+        '<div><label for="' + s + '-count">入数</label><input type="text" id="' + s + '-count" inputmode="decimal" autocomplete="off" value="1"></div>' +
+      '</div>' +
+      '<div class="field size-row">' +
+        '<div><label for="' + s + '-size">容量（1個あたり）</label><input type="text" id="' + s + '-size" inputmode="decimal" autocomplete="off" placeholder="例：500"></div>' +
+        '<div><label for="' + s + '-unit">単位</label><select id="' + s + '-unit"></select></div>' +
+      '</div>' +
+      '<div class="unit-price" id="' + s + '-up">単価：—</div>' +
+      '<button type="button" class="btn primary block hidden" id="' + s + '-record">' + L + 'を記録する</button>';
+    productsEl.appendChild(card);
+    fillUnitSelect($(s + '-unit'), UNIT_LIST, 'g');
+  });
+
+  const readSide = (s) => ({
+    price: $(s + '-price').value,
+    size: $(s + '-size').value,
+    unit: $(s + '-unit').value,
+    count: $(s + '-count').value
+  });
+  const isEmptySide = (s) => !$(s + '-price').value.trim() && !$(s + '-size').value.trim();
+
+  function updateCompare() {
+    const ups = {};
+    SIDES.forEach((s) => {
+      const v = readSide(s);
+      ups[s] = calcUnitPrice(v.price, v.size, v.unit, v.count);
+      $(s + '-up').innerHTML = ups[s]
+        ? '単価：<strong>' + formatYen(ups[s]) + '</strong>円/' + esc(ups[s].base)
+        : '単価：—';
+    });
+
+    const r = compareUnitPrices(ups.a, ups.b);
+    const res = $('cmp-result');
+    // いったん表示をリセット
+    SIDES.forEach((s) => {
+      $('card-' + s).classList.remove('best');
+      $('badge-' + s).classList.add('hidden');
+      $(s + '-record').classList.add('hidden');
+    });
+
+    if (r.status === 'invalid') {
+      res.className = 'result muted';
+      res.textContent = '価格と容量を入れると単価を計算します';
+      // 片方だけ入力されているときは、その商品を記録できるようにする
+      SIDES.forEach((s) => {
+        const other = s === 'a' ? 'b' : 'a';
+        if (ups[s] && isEmptySide(other)) $(s + '-record').classList.remove('hidden');
+      });
+    } else if (r.status === 'kind') {
+      res.className = 'result warn';
+      res.textContent = '単位の種類が違うため比較できません';
+    } else if (r.status === 'same') {
+      res.className = 'result';
+      res.textContent = '同じ（どちらも1' + r.base + 'あたり' + formatYen(ups.a) + '円）';
+      SIDES.forEach((s) => $(s + '-record').classList.remove('hidden'));
+    } else {
+      const w = r.cheaper;
+      res.className = 'result good';
+      res.textContent = w.toUpperCase() + 'のほうが1' + r.base + 'あたり' + r.diffText + '安い（' + r.pctText + 'お得）';
+      $('card-' + w).classList.add('best');
+      $('badge-' + w).classList.remove('hidden');
+      $(w + '-record').classList.remove('hidden');
+    }
+  }
+
+  SIDES.forEach((s) => {
+    ['price', 'size', 'count'].forEach((f) => $(s + '-' + f).addEventListener('input', updateCompare));
+    $(s + '-unit').addEventListener('change', () => {
+      // もう片方が未入力なら、単位を合わせておく（入力の手間を減らす）
+      const other = s === 'a' ? 'b' : 'a';
+      if (isEmptySide(other)) $(other + '-unit').value = $(s + '-unit').value;
+      updateCompare();
+    });
+    $(s + '-record').addEventListener('click', () => {
+      const v = readSide(s);
+      openSave(v, '');
+    });
+  });
+
+  $('btn-clear').addEventListener('click', () => {
+    SIDES.forEach((s) => {
+      $(s + '-price').value = '';
+      $(s + '-size').value = '';
+      $(s + '-count').value = '1';
+      $(s + '-unit').value = 'g';
+    });
+    updateCompare();
+  });
+
+  // =====================================================================
+  // 記録の保存（4.2）
+  // =====================================================================
+  let saveDraft = null;   // 保存しようとしている商品の価格・容量など
+
+  function openSave(v, itemName) {
+    const up = calcUnitPrice(v.price, v.size, v.unit, v.count);
+    if (!up) return;
+    saveDraft = {
+      price: String(v.price).normalize('NFKC').replace(/,/g, ''),
+      size: String(v.size).normalize('NFKC').replace(/,/g, ''),
+      unit: v.unit,
+      count: (String(v.count).normalize('NFKC').replace(/,/g, '').trim()) || '1'
+    };
+    $('save-summary').innerHTML =
+      '<div>' + esc(describeQty(saveDraft.price, saveDraft.size, saveDraft.unit, saveDraft.count)) + '</div>' +
+      '<div class="big">' + esc(formatUnitPrice(up)) + '</div>';
+    $('save-item').value = itemName || '';
+    $('save-product').value = '';
+    $('save-shop').value = '';
+    $('save-sale').checked = false;
+    $('save-memo').value = '';
+    $('save-error').classList.add('hidden');
+    renderDatalists();
+    openSheet('sheet-save');
+  }
+
+  function showError(id, msg) {
+    $(id).textContent = msg;
+    $(id).classList.remove('hidden');
+  }
+
+  $('btn-save').addEventListener('click', () => {
+    $('save-error').classList.add('hidden');
+    const item = $('save-item').value.trim();
+    if (!item) { showError('save-error', '品目名を入力してください'); return; }
+    const d = saveDraft;
+    const up = calcUnitPrice(d.price, d.size, d.unit, d.count);
+    if (!up) return;
+
+    // 更新ルールの判定
+    const j = judgeSave(records, item, up);
+    if (j.action === 'kind') {
+      const kindName = j.oldUp ? KIND_NAMES[j.oldUp.kind] : '別の種類';
+      showError('save-error', '「' + j.existing.item + '」の記録は' + kindName + 'の単位です。単位の種類が違うため保存できません。');
+      return;
+    }
+    if (j.action === 'cheaper' || j.action === 'notCheaper') {
+      if (!window.confirm(j.message)) return;
+    }
+
+    const rec = sanitizeRecord({
+      id: j.existing ? j.existing.id : newId(),
+      item,
+      product: $('save-product').value.trim(),
+      price: d.price, size: d.size, unit: d.unit, count: d.count,
+      shop: $('save-shop').value.trim(),
+      sale: $('save-sale').checked,
+      memo: $('save-memo').value,
+      date: todayStr()
+    });
+    if (!rec) return;
+    // 1品目1件：既存の記録を消して、新しい記録を先頭に入れる
+    const before = records;
+    records = [rec].concat(records.filter((r) => r !== j.existing));
+    if (!persist()) { records = before; return; }
+    addSuggest('items', rec.item);
+    addSuggest('shops', rec.shop);
+    closeSheets();
+    showToast(j.action === 'new' ? '記録しました' : '記録を更新しました');
+    renderList();
+  });
+
+  // =====================================================================
+  // 記録の一覧・検索（4.3）
+  // =====================================================================
+  function renderList() {
+    const q = normName($('search').value);
+    const list = $('rec-list');
+    const hits = records.filter((r) => !q ||
+      normName(r.item).includes(q) || normName(r.product).includes(q) || normName(r.shop).includes(q));
+    if (records.length === 0) {
+      list.innerHTML = '<div class="empty">まだ記録がありません。<br>比較タブの「記録する」から保存できます。</div>';
+      return;
+    }
+    if (hits.length === 0) {
+      list.innerHTML = '<div class="empty">見つかりませんでした</div>';
+      return;
+    }
+    list.innerHTML = hits.map((r) => {
+      const up = recordUnitPrice(r);
+      return '<button type="button" class="rec" data-id="' + esc(r.id) + '">' +
+        '<div class="rec-top"><span class="rec-item">' + esc(r.item) + (r.sale ? '<span class="sale">セール</span>' : '') + '</span>' +
+        '<span class="rec-price">' + esc(formatUnitPrice(up)) + '</span></div>' +
+        '<div class="rec-sub">' + esc(r.shop || 'お店未入力') + (r.product ? '　' + esc(r.product) : '') + '</div>' +
+        '</button>';
+    }).join('');
+  }
+  $('search').addEventListener('input', renderList);
+  $('rec-list').addEventListener('click', (e) => {
+    const btn = e.target.closest('.rec');
+    if (btn) openDetail(btn.dataset.id);
+  });
+
+  // ---------- 詳細 ----------
+  let currentId = null;
+  const findRec = (id) => records.find((r) => r.id === id);
+
+  function openDetail(id) {
+    const r = findRec(id);
+    if (!r) return;
+    currentId = id;
+    const up = recordUnitPrice(r);
+    const rows = [
+      ['品目名', r.item],
+      ['商品名', r.product || '—'],
+      ['単価', formatUnitPrice(up)],
+      ['価格', fmtNum(r.price) + '円'],
+      ['容量', fmtNum(r.size) + r.unit],
+      ['入数', fmtNum(r.count)],
+      ['お店', r.shop || '—'],
+      ['セール品', r.sale ? 'はい' : 'いいえ'],
+      ['メモ', r.memo || '—'],
+      ['記録日', r.date]
+    ];
+    $('detail-body').innerHTML = rows.map((x) => '<div><dt>' + esc(x[0]) + '</dt><dd>' + esc(x[1]) + '</dd></div>').join('');
+    openSheet('sheet-detail');
+  }
+
+  $('btn-delete').addEventListener('click', () => {
+    const r = findRec(currentId);
+    if (!r) return;
+    if (!window.confirm('「' + r.item + '」の記録を削除しますか？')) return;
+    const before = records;
+    records = records.filter((x) => x !== r);
+    if (!persist()) { records = before; return; }
+    closeSheets();
+    showToast('削除しました');
+    renderList();
+  });
+
+  // ---------- 編集 ----------
+  $('btn-to-edit').addEventListener('click', () => {
+    const r = findRec(currentId);
+    if (!r) return;
+    $('edit-item').value = r.item;
+    $('edit-product').value = r.product;
+    $('edit-price').value = fmtNum(r.price);
+    $('edit-size').value = fmtNum(r.size);
+    fillUnitSelect($('edit-unit'), unitsOfKind(UNITS[r.unit].kind), r.unit);   // 同じ種類の単位だけ選べる
+    $('edit-count').value = fmtNum(r.count);
+    $('edit-shop').value = r.shop;
+    $('edit-sale').checked = r.sale;
+    $('edit-memo').value = r.memo;
+    $('edit-error').classList.add('hidden');
+    renderDatalists();
+    updateEditPreview();
+    openSheet('sheet-edit');
+  });
+
+  function updateEditPreview() {
+    const up = calcUnitPrice($('edit-price').value, $('edit-size').value, $('edit-unit').value, $('edit-count').value);
+    $('edit-preview').innerHTML = up
+      ? '単価：<span class="big">' + esc(formatUnitPrice(up)) + '</span>'
+      : '単価：— （価格・容量・入数を正しく入力してください）';
+  }
+  ['edit-price', 'edit-size', 'edit-count'].forEach((id) => $(id).addEventListener('input', updateEditPreview));
+  $('edit-unit').addEventListener('change', updateEditPreview);
+
+  $('btn-edit-save').addEventListener('click', () => {
+    $('edit-error').classList.add('hidden');
+    const r = findRec(currentId);
+    if (!r) return;
+    const item = $('edit-item').value.trim();
+    if (!item) { showError('edit-error', '品目名を入力してください'); return; }
+    // 品目名を他の記録と同じ名前に変えるのは不可（1品目1件のため）
+    const dup = records.find((x) => x !== r && normName(x.item) === normName(item));
+    if (dup) { showError('edit-error', '「' + dup.item + '」の記録がすでにあります。別の品目名にしてください。'); return; }
+    const rec = sanitizeRecord({
+      id: r.id, item,
+      product: $('edit-product').value.trim(),
+      price: $('edit-price').value, size: $('edit-size').value, unit: $('edit-unit').value, count: $('edit-count').value.trim() || '1',
+      shop: $('edit-shop').value.trim(),
+      sale: $('edit-sale').checked,
+      memo: $('edit-memo').value,
+      date: r.date   // 編集（修正）では記録日は変えない
+    });
+    if (!rec) { showError('edit-error', '価格・容量・入数を正しく入力してください'); return; }
+    const before = records;
+    records = records.map((x) => (x === r ? rec : x));
+    if (!persist()) { records = before; return; }
+    addSuggest('items', rec.item);
+    addSuggest('shops', rec.shop);
+    showToast('変更を保存しました');
+    renderList();
+    openDetail(rec.id);
+  });
+
+  // =====================================================================
+  // 記録と目の前の商品を比べる（4.4）
+  // =====================================================================
+  $('btn-to-rcompare').addEventListener('click', () => {
+    const r = findRec(currentId);
+    if (!r) return;
+    const up = recordUnitPrice(r);
+    $('rc-summary').innerHTML =
+      '<div>記録：' + esc(r.item) + (r.product ? '（' + esc(r.product) + '）' : '') + '</div>' +
+      '<div class="big">' + esc(formatUnitPrice(up)) + '</div>' +
+      '<div class="rec-sub">' + esc(describeQty(r.price, r.size, r.unit, r.count)) + (r.shop ? '　' + esc(r.shop) : '') + '</div>';
+    $('rc-price').value = '';
+    $('rc-size').value = '';
+    $('rc-count').value = '1';
+    fillUnitSelect($('rc-unit'), unitsOfKind(up.kind), r.unit);   // 記録と同じ種類の単位だけ選べる
+    updateRCompare();
+    openSheet('sheet-rcompare');
+  });
+
+  function updateRCompare() {
+    const r = findRec(currentId);
+    if (!r) return;
+    const recUp = recordUnitPrice(r);
+    const nowUp = calcUnitPrice($('rc-price').value, $('rc-size').value, $('rc-unit').value, $('rc-count').value);
+    const res = $('rc-result');
+    $('rc-unitprice').innerHTML = nowUp ? '目の前の商品：<strong>' + formatYen(nowUp) + '</strong>円/' + esc(nowUp.base) : '';
+    $('btn-rc-update').classList.add('hidden');
+    const c = compareUnitPrices(nowUp, recUp);   // a = 目の前の商品、b = 記録
+    if (c.status === 'invalid') {
+      res.className = 'result muted';
+      res.textContent = '価格と容量を入れると記録と比べます';
+    } else if (c.status === 'kind') {
+      res.className = 'result warn';
+      res.textContent = '単位の種類が違うため比較できません';
+    } else if (c.status === 'same') {
+      res.className = 'result';
+      res.textContent = '記録と同じ単価です';
+    } else if (c.cheaper === 'a') {
+      res.className = 'result good';
+      res.textContent = '記録より1' + c.base + 'あたり' + c.diffText + '安い！（' + c.pctText + 'お得）';
+      $('btn-rc-update').classList.remove('hidden');   // 記録より安ければ更新へ進める
+    } else {
+      res.className = 'result warn';
+      res.textContent = '記録のほうが' + c.pctText + 'お得（1' + c.base + 'あたり' + c.diffText + '安い）';
+    }
+  }
+  ['rc-price', 'rc-size', 'rc-count'].forEach((id) => $(id).addEventListener('input', updateRCompare));
+  $('rc-unit').addEventListener('change', updateRCompare);
+
+  $('btn-rc-update').addEventListener('click', () => {
+    const r = findRec(currentId);
+    if (!r) return;
+    openSave({ price: $('rc-price').value, size: $('rc-size').value, unit: $('rc-unit').value, count: $('rc-count').value }, r.item);
+  });
+
+  // ---------- 起動 ----------
+  updateCompare();
+  renderList();
+
+  // オフライン対応（Service Worker）の登録。対応していない環境では何もしない
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./service-worker.js').catch(() => {});
+    });
+  }
+})();
+</script>
+</body>
+</html>
