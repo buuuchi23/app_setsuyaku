@@ -1,6 +1,6 @@
 // オフライン対応用 Service Worker
 // アプリを更新したときは CACHE_NAME の版番号を上げる（古いキャッシュが消えて新しいファイルが入る）
-const CACHE_NAME = 'tanka-v2';
+const CACHE_NAME = 'tanka-v3';
 const FILES = [
   './',
   './index.html',
